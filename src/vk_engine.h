@@ -16,21 +16,22 @@ public:
 
 	struct SDL_Window* _window{ nullptr };
 
-	VkInstance _instance;						// Vulkan library handle
-	VkDebugUtilsMessengerEXT _debug_messenger;	// Vulkan debug output handle
-	VkPhysicalDevice _chosenGPU;				// GPU chosen as the default device
-	VkDevice _device;							// Vulkan device for commands
-	VkSurfaceKHR _surface;						// Vulkan window surface
-	VkSwapchainKHR _swapchain;					// Vulkan swapchain
+	VkInstance _instance;							// Vulkan library handle
+	VkDebugUtilsMessengerEXT _debug_messenger;		// Vulkan debug output handle
+	VkPhysicalDevice _chosenGPU;					// GPU chosen as the default device
+	VkDevice _device;								// Vulkan device for commands
+	VkSurfaceKHR _surface;							// Vulkan window surface
 
-	// Image format expected by the windowing system
-	VkFormat _swapchainImageFormat;
+	VkSwapchainKHR _swapchain;						// Vulkan swapchain
+	VkFormat _swapchainImageFormat;					// Image format expected by the windowing system
+	std::vector<VkImage> _swapchainImages;			// Array of images from the swapchain
+	std::vector<VkImageView> _swapchainImageViews;	// Array of image-views from the swapchain
 
-	// Array of images from the swapchain
-	std::vector<VkImage> _swapchainImages;
-
-	// Array of image-views from the swapchain
-	std::vector<VkImageView> _swapchainImageViews;
+	VkQueue _graphicsQueue;							// Queue that will be submitted to
+	uint32_t _graphicsQueueFamily;					// The family of the graphics queue
+	
+	VkCommandPool _commandPool;						// The command pool for the cammands to be sent to the GPU
+	VkCommandBuffer _mainCommandBuffer;				// The buffer that will be recorded into
 
 	//initializes everything in the engine
 	void init();
@@ -47,4 +48,5 @@ public:
 private:
 	void init_vulkan();
 	void init_swapchain();
+	void init_commands();
 };

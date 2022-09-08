@@ -12,7 +12,7 @@
 
 #include <iostream>
 
-// Immediately abort when an error occurs
+// A macro function that will immediately abort when an error occurs
 #define VK_CHECK(x)														\
 	do																	\
 	{																	\
@@ -45,6 +45,9 @@ void VulkanEngine::init()
 
 	// Create the swapchain
 	init_swapchain();
+
+	// Create the commands to be sent to the GPU
+	init_commands();
 	
 	//everything went fine
 	_isInitialized = true;
@@ -86,6 +89,10 @@ void VulkanEngine::init_vulkan()
 	// Get the VkDevice handle used in the rest of a Vulkan application
 	_device = vkbDevice.device;
 	_chosenGPU = physicalDevice.physical_device;
+
+	// Use VkBootstrap to get a graphics queue
+	_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+	_graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 }
 
 void VulkanEngine::init_swapchain()
@@ -107,10 +114,25 @@ void VulkanEngine::init_swapchain()
 	_swapchainImageFormat = vkbSwapchain.image_format;
 }
 
+void VulkanEngine::init_commands()
+{
+	// Create a command pool for commands submitted to the graphics queue and allow the pool to reset individual command buffers
+	VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(_graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+	VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_commandPool));
+
+	// Allocate the default command buffer that will be used for rendering
+	VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_commandPool, 1);
+
+	VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_mainCommandBuffer));
+}
+
+
 void VulkanEngine::cleanup()
 {	
 	if (_isInitialized)
 	{
+		vkDestroyCommandPool(_device, _commandPool, nullptr);
 		vkDestroySwapchainKHR(_device, _swapchain, nullptr);
 
 		// Destroy the swapchain resources
