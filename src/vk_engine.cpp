@@ -48,6 +48,12 @@ void VulkanEngine::init()
 
 	// Create the commands to be sent to the GPU
 	init_commands();
+
+	// Create the renderpass
+	init_default_renderpass();
+
+	// Create an array of framebuffers
+	init_framebuffers();
 	
 	//everything went fine
 	_isInitialized = true;
@@ -127,6 +133,81 @@ void VulkanEngine::init_commands()
 	VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_mainCommandBuffer));
 }
 
+void VulkanEngine::init_default_renderpass()
+{
+	/////////// The main attachment ///////////
+	// The renderpass will use this color attachment (the description of the image to be rendered)
+	VkAttachmentDescription color_attachment = {};
+	// Set the format of the color attachment to that needed by the swapchain
+	color_attachment.format = _swapchainImageFormat;
+	// 1 sample (no multisampling)
+	color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	// Clear when the attachment is loaded
+	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	// Keep the attachment stored when the renderpass ends
+	color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	// Do not care about stencil
+	color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+	// The starting layout is unknown and something we dont care about
+	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	// After the renderpass ends, set the layout of the image to be ready for displaying with the swapchain
+	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	/////////// The subpass ///////////
+	// Create a subpass that uses the attachment
+	VkAttachmentReference color_attachment_ref = {};
+	// The attachment number will be the index number withing the parent renderpass's pAttachments array
+	color_attachment_ref.attachment = 0;
+	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	// Create 1 subpass, the minimum you can create
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &color_attachment_ref;
+
+	/////////// The renderpass ///////////
+	// Create a renderpass to be loaded with the attachment and subpass
+	VkRenderPassCreateInfo render_pass_info = {};
+	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+
+	// Connect the color attachment to the info
+	render_pass_info.attachmentCount = 1;
+	render_pass_info.pAttachments = &color_attachment;
+	// Connect the subpass to the info
+	render_pass_info.subpassCount = 1;
+	render_pass_info.pSubpasses = &subpass;
+
+	VK_CHECK(vkCreateRenderPass(_device, &render_pass_info, nullptr, &_renderPass));
+}
+
+void VulkanEngine::init_framebuffers()
+{
+	// Create the framebuffers for the swapchain images. This will connect the penderpass to the images for rendering
+	VkFramebufferCreateInfo fb_info = {};
+	fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fb_info.pNext = nullptr;
+
+	fb_info.renderPass = _renderPass;
+	fb_info.attachmentCount = 1;
+	fb_info.width = _windowExtent.width;
+	fb_info.height = _windowExtent.height;
+	fb_info.layers = 1;
+
+	// Count how many images are stored in the swapchain
+	const uint32_t swapchain_imagecount = _swapchainImages.size();
+	_framebuffers = std::vector<VkFramebuffer>(swapchain_imagecount);
+
+	// Create framebuffers for each of the swapchain image views
+	for (int i = 0; i < swapchain_imagecount; i++)
+	{
+		fb_info.pAttachments = &_swapchainImageViews[i];
+		VK_CHECK(vkCreateFramebuffer(_device, &fb_info, nullptr, &_framebuffers[i]));
+	}
+}
 
 void VulkanEngine::cleanup()
 {	
@@ -135,9 +216,16 @@ void VulkanEngine::cleanup()
 		vkDestroyCommandPool(_device, _commandPool, nullptr);
 		vkDestroySwapchainKHR(_device, _swapchain, nullptr);
 
+		// Destroy the main renderpass
+		vkDestroyRenderPass(_device, _renderPass, nullptr);
+
 		// Destroy the swapchain resources
-		for (int i = 0; i < _swapchainImageViews.size(); i++)
+		for (int i = 0; i < _framebuffers.size(); i++)
+		{
+			vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
+
 			vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
+		}
 		
 		vkDestroyDevice(_device, nullptr);
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);

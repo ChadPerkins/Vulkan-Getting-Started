@@ -33,6 +33,9 @@ public:
 	VkCommandPool _commandPool;						// The command pool for the cammands to be sent to the GPU
 	VkCommandBuffer _mainCommandBuffer;				// The buffer that will be recorded into
 
+	VkRenderPass _renderPass;						// Vulkan renderpass
+	std::vector<VkFramebuffer> _framebuffers;		// Array of framebuffers
+
 	//initializes everything in the engine
 	void init();
 
@@ -49,4 +52,6 @@ private:
 	void init_vulkan();
 	void init_swapchain();
 	void init_commands();
+	void init_default_renderpass();
+	void init_framebuffers();
 };
