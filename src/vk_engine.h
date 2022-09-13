@@ -39,6 +39,12 @@ public:
 	VkRenderPass _renderPass;							// Vulkan renderpass
 	std::vector<VkFramebuffer> _framebuffers;			// Array of framebuffers
 
+	VkPipeline _trianglePipeline;						// The actual graphics pipeline
+	VkPipelineLayout _trianglePipelineLayout;			// The layout of graphics pipeline
+
+	// Load a shader module from a spir-v file. Returns fasle if any errors occur
+	bool load_shader_module(const char* filepath, VkShaderModule* outShaderModule);
+
 	//initializes everything in the engine
 	void init();
 
@@ -58,4 +64,7 @@ private:
 	void init_default_renderpass();
 	void init_framebuffers();
 	void init_sync_structures();
+	void init_pipelines();
 };
+
+

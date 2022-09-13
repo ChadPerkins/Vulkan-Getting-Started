@@ -1,16 +1,6 @@
 ﻿#include <vk_initializers.h>
 
-VkCommandPoolCreateInfo vkinit::command_pool_create_info(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags /*= 0*/)
-{
-	VkCommandPoolCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	info.pNext = nullptr;
-
-	info.flags = flags;
-	return info;
-}
-
-VkCommandBufferAllocateInfo vkinit::command_buffer_allocate_info(VkCommandPool pool, uint32_t count /*= 1*/, VkCommandBufferLevel level /*= VK_COMMAND_BUFFER_LEVEL_PRIMARY*/)
+VkCommandBufferAllocateInfo vkinit::command_buffer_allocate_info(VkCommandPool pool, uint32_t count, VkCommandBufferLevel level)
 {
 	VkCommandBufferAllocateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -19,10 +9,11 @@ VkCommandBufferAllocateInfo vkinit::command_buffer_allocate_info(VkCommandPool p
 	info.commandPool = pool;
 	info.commandBufferCount = count;
 	info.level = level;
+
 	return info;
 }
 
-VkCommandBufferBeginInfo vkinit::command_buffer_begin_info(VkCommandBufferUsageFlags flags /*= 0*/)
+VkCommandBufferBeginInfo vkinit::command_buffer_begin_info(VkCommandBufferUsageFlags flags)
 {
 	VkCommandBufferBeginInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -30,7 +21,43 @@ VkCommandBufferBeginInfo vkinit::command_buffer_begin_info(VkCommandBufferUsageF
 
 	info.pInheritanceInfo = nullptr;
 	info.flags = flags;
+
 	return info;
+}
+
+VkCommandPoolCreateInfo vkinit::command_pool_create_info(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags)
+{
+	VkCommandPoolCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	info.pNext = nullptr;
+
+	info.flags = flags;
+
+	return info;
+}
+
+VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags)
+{
+	VkFenceCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	info.pNext = nullptr;
+
+	info.flags = flags;
+
+	return info;
+}
+
+VkPipelineColorBlendAttachmentState vkinit::color_blend_attachment_state()
+{
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | 
+										  VK_COLOR_COMPONENT_G_BIT |
+										  VK_COLOR_COMPONENT_B_BIT |
+										  VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+
+
+	return colorBlendAttachment;
 }
 
 VkFramebufferCreateInfo vkinit::framebuffer_create_info(VkRenderPass renderPass, VkExtent2D extent)
@@ -48,39 +75,101 @@ VkFramebufferCreateInfo vkinit::framebuffer_create_info(VkRenderPass renderPass,
 	return info;
 }
 
-VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags /*= 0*/)
+VkPipelineInputAssemblyStateCreateInfo vkinit::input_assembly_create_info(VkPrimitiveTopology topology)
 {
-	VkFenceCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	VkPipelineInputAssemblyStateCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	info.pNext = nullptr;
 
-	info.flags = flags;
+	info.topology = topology;
+	info.primitiveRestartEnable = VK_FALSE;
 
 	return info;
 }
 
-VkSemaphoreCreateInfo vkinit::semaphore_create_info(VkSemaphoreCreateFlags flags /*= 0*/)
+VkPipelineLayoutCreateInfo vkinit::pipeline_layout_create_info()
 {
-	VkSemaphoreCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	VkPipelineLayoutCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	info.pNext = nullptr;
-	info.flags = flags;
+
+	// Set up empty defaults
+	info.flags = 0;
+	info.setLayoutCount = 0;
+	info.pSetLayouts = nullptr;
+	info.pushConstantRangeCount = 0;
+	info.pPushConstantRanges = nullptr;
+
 	return info;
 }
 
-VkSubmitInfo vkinit::submit_info(VkCommandBuffer* cmd)
+VkPipelineMultisampleStateCreateInfo vkinit::multisampling_state_create_info()
 {
-	VkSubmitInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	VkPipelineMultisampleStateCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	info.pNext = nullptr;
 
-	info.waitSemaphoreCount = 0;
-	info.pWaitSemaphores = nullptr;
-	info.pWaitDstStageMask = nullptr;
-	info.commandBufferCount = 1;
-	info.pCommandBuffers = cmd;
-	info.signalSemaphoreCount = 0;
-	info.pSignalSemaphores = nullptr;
+	info.sampleShadingEnable = VK_FALSE;
+	// Multisampling defaulted to no multisampling (1 sample per pixel)
+	info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	info.minSampleShading = 1.0f;
+	info.pSampleMask = nullptr;
+	info.alphaToCoverageEnable = VK_FALSE;
+	info.alphaToOneEnable = VK_FALSE;
+
+	return info;
+}
+
+VkPipelineRasterizationStateCreateInfo vkinit::rasterization_state_create_info(VkPolygonMode polygonMode)
+{
+	VkPipelineRasterizationStateCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	info.pNext = nullptr;
+
+	info.depthClampEnable = VK_FALSE;
+	// Tell weather or not to discard all primitives before the rasterization stage
+	info.rasterizerDiscardEnable = VK_FALSE;
+
+	info.polygonMode = polygonMode;
+	info.lineWidth = 1.0f;
+	// No backface cull
+	info.cullMode = VK_CULL_MODE_NONE;
+	info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	// No depth bias
+	info.depthBiasEnable = VK_FALSE;
+	info.depthBiasConstantFactor = 0.0f;
+	info.depthBiasClamp = 0.0f;
+	info.depthBiasSlopeFactor = 0.0f;
+
+	return info;
+}
+
+VkPipelineShaderStageCreateInfo vkinit::pipeline_shader_stage_create_info(VkShaderStageFlagBits stage, VkShaderModule shaderModule)
+{
+	VkPipelineShaderStageCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	info.pNext = nullptr;
+
+	// Shader stage
+	info.stage = stage;
+	// Module containing the code for this shader stage
+	info.module = shaderModule;
+	// The entry point of the shader
+	info.pName = "main";
+
+	return info;
+}
+
+// Equivalent to a VAO in OpenGL
+VkPipelineVertexInputStateCreateInfo vkinit::vertex_input_state_create_info()
+{
+	VkPipelineVertexInputStateCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	info.pNext = nullptr;
+
+	// Set no vertex bindings or attributes
+	info.vertexBindingDescriptionCount = 0;
+	info.vertexAttributeDescriptionCount = 0;
 
 	return info;
 }
@@ -116,3 +205,44 @@ VkRenderPassBeginInfo vkinit::renderpass_begin_info(VkRenderPass renderPass, VkE
 
 	return info;
 }
+
+VkSemaphoreCreateInfo vkinit::semaphore_create_info(VkSemaphoreCreateFlags flags)
+{
+	VkSemaphoreCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	info.pNext = nullptr;
+	info.flags = flags;
+
+	return info;
+}
+
+VkShaderModuleCreateInfo vkinit::shader_module_create_info(std::vector<uint32_t> buffer)
+{
+	VkShaderModuleCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	info.pNext = nullptr;
+
+	//codeSize has to be in bytes, so multiply the ints in the buffer by size of int to know the real size of the buffer
+	info.codeSize = buffer.size() * sizeof(uint32_t);
+	info.pCode = buffer.data();
+
+	return info;
+}
+
+VkSubmitInfo vkinit::submit_info(VkCommandBuffer* cmd)
+{
+	VkSubmitInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	info.pNext = nullptr;
+
+	info.waitSemaphoreCount = 0;
+	info.pWaitSemaphores = nullptr;
+	info.pWaitDstStageMask = nullptr;
+	info.commandBufferCount = 1;
+	info.pCommandBuffers = cmd;
+	info.signalSemaphoreCount = 0;
+	info.pSignalSemaphores = nullptr;
+
+	return info;
+}
+

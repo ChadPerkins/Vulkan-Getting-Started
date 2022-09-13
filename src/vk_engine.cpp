@@ -1,15 +1,17 @@
 ﻿
 #include "vk_engine.h"
+#include "vk_pipeline.h"
 
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
-#include <vk_types.h>
 #include <vk_initializers.h>
+#include <vk_types.h>
 
 // Bootstrap library
 #include "VkBootstrap.h"
 
+#include <fstream>
 #include <iostream>
 
 // A macro function that will immediately abort when an error occurs
@@ -58,6 +60,9 @@ void VulkanEngine::init()
 	// Initialize the CPU and GPU sync structures
 	init_sync_structures();
 	
+	// Initialize the object rendering pipelines
+	init_pipelines();
+
 	//everything went fine
 	_isInitialized = true;
 }
@@ -132,7 +137,13 @@ void VulkanEngine::draw()
 	rpInfo.clearValueCount = 1;
 	rpInfo.pClearValues = &clearValue;
 
+	// Begin the renderpass
 	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	// Once rendering commands are added, they will go here
+
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
+	vkCmdDraw(cmd, 3, 1, 0, 0);
 
 	// Finalize the render pass
 	vkCmdEndRenderPass(cmd);
@@ -346,9 +357,10 @@ void VulkanEngine::init_commands()
 void VulkanEngine::init_sync_structures()
 {
 	// Create the synchronization structures
-	// one fence to control when the gpu has finished rendering the frame,
-	// and 2 semaphores to syncronize rendering with swapchain
-	// we want the fence to start signalled so we can wait on it on the first frame
+	// One fence to control when the GPU has finished rendering the frame,
+	// 2 semaphores to syncronize rendering with swapchain
+	// Have the fence to start signalled so the user
+	//  can wait on it on the first frame
 	////////// Creating the fence //////////
 	VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
 
@@ -359,6 +371,117 @@ void VulkanEngine::init_sync_structures()
 
 	VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_presentSemaphore));
 	VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_renderSemaphore));
+}
 
-	
+void VulkanEngine::init_pipelines()
+{
+	VkShaderModule triangleFragShader;
+	if (!load_shader_module("../../shaders/triangle.frag.spv", &triangleFragShader))
+	{
+		std::cout << "Error when building the triangle fragment shader module" << std::endl;
+	}
+	else {
+		std::cout << "Triangle fragment shader successfully loaded" << std::endl;
+	}
+
+	VkShaderModule triangleVertexShader;
+	if (!load_shader_module("../../shaders/triangle.vert.spv", &triangleVertexShader))
+	{
+		std::cout << "Error when building the triangle vertex shader module" << std::endl;
+
+	}
+	else {
+		std::cout << "Triangle vertex shader successfully loaded" << std::endl;
+	}
+
+	// Build the pipeline layout that controls the inputs/outputs of the shader
+	VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
+
+	VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_trianglePipelineLayout));
+
+	// Build the stage-create-info for both the vertex and fragment stages
+	PipelineBuilder pipelineBuilder;
+
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, triangleVertexShader));
+
+	pipelineBuilder._shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
+
+	// Vertex input controls how to read vertices from vertex buffers.
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
+
+	// Input assembly is the configuration for drawing triangle lists, strips, or individual points.
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
+	// Build the viewport and scissor from the swapchain extents
+	pipelineBuilder._viewport.x = 0.0f;
+	pipelineBuilder._viewport.y = 0.0f;
+	pipelineBuilder._viewport.width = (float)_windowExtent.width;
+	pipelineBuilder._viewport.height = (float)_windowExtent.height;
+	pipelineBuilder._viewport.minDepth = 0.0f;
+	pipelineBuilder._viewport.maxDepth = 1.0f;
+
+	pipelineBuilder._scissor.offset = { 0, 0 };
+	pipelineBuilder._scissor.extent = _windowExtent;
+
+	// Configure the rasterizer to draw filled triangles
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
+
+	// Multisampling isnt being used so just run the default one
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
+
+	// A single blend attachment with no blending and writing to RGBA
+	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
+
+	// Use the triangle layout that was just created
+	pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
+
+	// Finally build the pipeline
+	_trianglePipeline = pipelineBuilder.build_pipeline(_device, _renderPass);
+
+}
+
+bool VulkanEngine::load_shader_module(const char* filepath, VkShaderModule* outShaderModule)
+{
+	// Open the file with the cursor at the end of the file
+	std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+
+	if (!file.is_open())
+{
+		return false;
+	}
+
+	// Use the cursor to figure out the size of the file (since the cursor is at the end, it will give us the file size directly in bytes)
+	size_t fileSize = (size_t)file.tellg();
+
+	// Reserve an int vector big enough for the entire file since Spirv expects the buffer to be on uint32
+	std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+
+	// Put the cursor at the begining of the file
+	file.seekg(0);
+
+	// Load the whole file into the buffer
+	file.read((char*)buffer.data(), fileSize);
+
+	// Close the file since it is no longer needed
+	file.close();
+
+	// Create a new shader module using the buffer
+
+	VkShaderModuleCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.pNext = nullptr;
+
+	// codeSize has to be in bytes, so multiply the ints in the buffer by size of int to know the real size of the buffer
+	createInfo.codeSize = buffer.size() * sizeof(uint32_t);
+	createInfo.pCode = buffer.data();
+
+	// Make sure the creation succeeded
+	VkShaderModule shaderModule;
+	if (vkCreateShaderModule(_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+		return false;
+	}
+	*outShaderModule = shaderModule;
+	return true;
 }
