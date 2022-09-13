@@ -9,8 +9,10 @@
 class VulkanEngine {
 public:
 
-	bool _isInitialized{ false };
 	int _frameNumber {0};
+	bool _isInitialized{ false };
+
+	int _selectedShader{ 0 };
 
 	VkExtent2D _windowExtent{ 1700 , 900 };
 
@@ -39,8 +41,10 @@ public:
 	VkRenderPass _renderPass;							// Vulkan renderpass
 	std::vector<VkFramebuffer> _framebuffers;			// Array of framebuffers
 
-	VkPipeline _trianglePipeline;						// The actual graphics pipeline
 	VkPipelineLayout _trianglePipelineLayout;			// The layout of graphics pipeline
+
+	VkPipeline _trianglePipeline;						// The actual graphics pipeline
+	VkPipeline _redTrianglePipeline;					// The graphics pipeline for a second shader
 
 	// Load a shader module from a spir-v file. Returns fasle if any errors occur
 	bool load_shader_module(const char* filepath, VkShaderModule* outShaderModule);
