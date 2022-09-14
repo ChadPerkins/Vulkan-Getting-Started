@@ -36,17 +36,6 @@ VkCommandPoolCreateInfo vkinit::command_pool_create_info(uint32_t queueFamilyInd
 	return info;
 }
 
-VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags)
-{
-	VkFenceCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	info.pNext = nullptr;
-
-	info.flags = flags;
-
-	return info;
-}
-
 VkPipelineColorBlendAttachmentState vkinit::color_blend_attachment_state()
 {
 	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
@@ -58,6 +47,17 @@ VkPipelineColorBlendAttachmentState vkinit::color_blend_attachment_state()
 
 
 	return colorBlendAttachment;
+}
+
+VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags)
+{
+	VkFenceCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	info.pNext = nullptr;
+
+	info.flags = flags;
+
+	return info;
 }
 
 VkFramebufferCreateInfo vkinit::framebuffer_create_info(VkRenderPass renderPass, VkExtent2D extent)

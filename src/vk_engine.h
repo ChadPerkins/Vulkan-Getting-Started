@@ -4,7 +4,32 @@
 #pragma once
 
 #include <vk_types.h>
+
+#include <functional>
+#include <queue>
 #include <vector>
+
+struct DeletionQueue
+{
+	std::deque<std::function<void()>> deletors;
+
+	void push_function(std::function<void()>&& function)
+	{
+		deletors.push_back(function);
+	}
+
+	void flush()
+	{
+		// Reverse iterate the deletion queue to execute all of the functions
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
+		{
+			// Call the function
+			(*it)();
+		}
+
+		deletors.clear();
+	}
+};
 
 class VulkanEngine {
 public:
@@ -45,6 +70,8 @@ public:
 
 	VkPipeline _trianglePipeline;						// The actual graphics pipeline
 	VkPipeline _redTrianglePipeline;					// The graphics pipeline for a second shader
+
+	DeletionQueue _mainDeletionQueue;					// A deletion queue to make sure object get deleted only when they are done beign used
 
 	// Load a shader module from a spir-v file. Returns fasle if any errors occur
 	bool load_shader_module(const char* filepath, VkShaderModule* outShaderModule);
