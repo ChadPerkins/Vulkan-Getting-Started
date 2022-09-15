@@ -4,10 +4,19 @@
 #pragma once
 
 #include <vk_types.h>
+#include "vk_mesh.h"
+
+#include <glm/glm.hpp>
 
 #include <functional>
 #include <queue>
 #include <vector>
+
+struct MeshPushConstants
+{
+	glm::vec4 data;
+	glm::mat4 render_matrix;
+};
 
 struct DeletionQueue
 {
@@ -73,8 +82,20 @@ public:
 
 	DeletionQueue _mainDeletionQueue;					// A deletion queue to make sure object get deleted only when they are done beign used
 
+	VmaAllocator _allocator;							// A memory allocator to allocate memory for buffers (index/vertex)
+
+	VkPipeline _meshPipeline;							// A pipeline that doesnt hardcode a triangle
+	VkPipelineLayout _meshPipelineLayout;				// The layout for the mesh pipeline
+
+	Mesh _triangleMesh;
+	Mesh _monkeyMesh;
+
 	// Load a shader module from a spir-v file. Returns fasle if any errors occur
 	bool load_shader_module(const char* filepath, VkShaderModule* outShaderModule);
+
+	void load_meshes();
+
+	void upload_meshes(Mesh& mesh);
 
 	//initializes everything in the engine
 	void init();
