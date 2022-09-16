@@ -36,18 +36,45 @@ VkCommandPoolCreateInfo vkinit::command_pool_create_info(uint32_t queueFamilyInd
 	return info;
 }
 
-VkPipelineColorBlendAttachmentState vkinit::color_blend_attachment_state()
+VkImageCreateInfo vkinit::image_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent)
 {
-	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | 
-										  VK_COLOR_COMPONENT_G_BIT |
-										  VK_COLOR_COMPONENT_B_BIT |
-										  VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
+	VkImageCreateInfo info = { };
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	info.pNext = nullptr;
 
+	info.imageType = VK_IMAGE_TYPE_2D;
 
-	return colorBlendAttachment;
+	info.format = format;
+	info.extent = extent;
+
+	info.mipLevels = 1;
+	info.arrayLayers = 1;
+	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.usage = usageFlags;
+
+	return info;
 }
+
+VkImageViewCreateInfo vkinit::image_view_create_info(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags)
+{
+	// Build a image-view for the depth image to use for rendering
+	VkImageViewCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	info.pNext = nullptr;
+
+	info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	info.image = image;
+	info.format = format;
+	info.subresourceRange.baseMipLevel = 0;
+	info.subresourceRange.levelCount = 1;
+	info.subresourceRange.baseArrayLayer = 0;
+	info.subresourceRange.layerCount = 1;
+	info.subresourceRange.aspectMask = aspectFlags;
+
+	return info;
+}
+
 
 VkFenceCreateInfo vkinit::fence_create_info(VkFenceCreateFlags flags)
 {
@@ -74,6 +101,37 @@ VkFramebufferCreateInfo vkinit::framebuffer_create_info(VkRenderPass renderPass,
 
 	return info;
 }
+
+VkPipelineColorBlendAttachmentState vkinit::color_blend_attachment_state()
+{
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | 
+										  VK_COLOR_COMPONENT_G_BIT |
+										  VK_COLOR_COMPONENT_B_BIT |
+										  VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+
+
+	return colorBlendAttachment;
+}
+
+VkPipelineDepthStencilStateCreateInfo vkinit::depth_stencil_create_info(bool bDepthTest, bool bDepthWrite, VkCompareOp compareOp)
+{
+	VkPipelineDepthStencilStateCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	info.pNext = nullptr;
+
+	info.depthTestEnable = bDepthTest ? VK_TRUE : VK_FALSE;
+	info.depthWriteEnable = bDepthWrite ? VK_TRUE : VK_FALSE;
+	info.depthCompareOp = bDepthTest ? compareOp : VK_COMPARE_OP_ALWAYS;
+	info.depthBoundsTestEnable = VK_FALSE;
+	info.minDepthBounds = 0.0f; // Optional
+	info.maxDepthBounds = 1.0f; // Optional
+	info.stencilTestEnable = VK_FALSE;
+
+	return info;
+}
+
 
 VkPipelineInputAssemblyStateCreateInfo vkinit::input_assembly_create_info(VkPrimitiveTopology topology)
 {

@@ -87,6 +87,11 @@ public:
 	VkPipeline _meshPipeline;							// A pipeline that doesnt hardcode a triangle
 	VkPipelineLayout _meshPipelineLayout;				// The layout for the mesh pipeline
 
+	VkImageView _depthImageView;
+	AllocatedImage _depthImage;
+
+	VkFormat _depthFormat;
+
 	Mesh _triangleMesh;
 	Mesh _monkeyMesh;
 
