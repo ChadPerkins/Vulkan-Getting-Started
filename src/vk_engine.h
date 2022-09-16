@@ -12,6 +12,21 @@
 #include <queue>
 #include <vector>
 
+//note that we store the VkPipeline and layout by value, not pointer.
+//They are 64 bit handles to internal driver structures anyway so storing pointers to them isn't very useful
+struct Material {
+	VkPipeline pipeline;
+	VkPipelineLayout pipelineLayout;
+};
+
+struct RenderObject {
+	Mesh* mesh;
+
+	Material* material;
+
+	glm::mat4 transformMatrix;
+};
+
 struct MeshPushConstants
 {
 	glm::vec4 data;
@@ -95,6 +110,24 @@ public:
 	Mesh _triangleMesh;
 	Mesh _monkeyMesh;
 
+	// Default array of renderable objects
+	std::vector<RenderObject> _renderables;
+
+	std::unordered_map<std::string, Material> _materials;
+	std::unordered_map<std::string, Mesh> _meshes;
+
+	// Create material and add it to the map
+	Material* create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string& name);
+
+	// Returns nullptr if it can't be found
+	Material* get_material(const std::string& name);
+
+	// Returns nullptr if it can't be found
+	Mesh* get_mesh(const std::string& name);
+
+	// Draw function
+	void draw_objects(VkCommandBuffer cmd, RenderObject* first, int count);
+
 	// Load a shader module from a spir-v file. Returns fasle if any errors occur
 	bool load_shader_module(const char* filepath, VkShaderModule* outShaderModule);
 
@@ -122,6 +155,7 @@ private:
 	void init_framebuffers();
 	void init_sync_structures();
 	void init_pipelines();
+	void init_scene();
 };
 
 
