@@ -12,6 +12,43 @@
 #include <queue>
 #include <vector>
 
+constexpr unsigned int FRAME_OVERLAP = 2;
+
+struct GPUObjectData {
+	glm::mat4 modelMatrix;
+};
+
+
+struct GPUSceneData {
+	glm::vec4 fogColor; // w is for exponent
+	glm::vec4 fogDistances; //x for min, y for max, zw unused.
+	glm::vec4 ambientColor;
+	glm::vec4 sunlightDirection; //w for sun power
+	glm::vec4 sunlightColor;
+};
+
+struct GPUCameraData {
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::mat4 viewproj;
+};
+
+struct FrameData {
+	VkSemaphore _presentSemaphore, _renderSemaphore;
+	VkFence _renderFence;
+
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+
+	// Buffer that holds a single GPUCameraData to use when rendering
+	AllocatedBuffer cameraBuffer;
+	AllocatedBuffer objectBuffer;
+
+	VkDescriptorSet objectDescriptor;
+
+	VkDescriptorSet globalDescriptor;
+};
+
 //note that we store the VkPipeline and layout by value, not pointer.
 //They are 64 bit handles to internal driver structures anyway so storing pointers to them isn't very useful
 struct Material {
@@ -37,18 +74,14 @@ struct DeletionQueue
 {
 	std::deque<std::function<void()>> deletors;
 
-	void push_function(std::function<void()>&& function)
-	{
+	void push_function(std::function<void()>&& function) {
 		deletors.push_back(function);
 	}
 
-	void flush()
-	{
-		// Reverse iterate the deletion queue to execute all of the functions
-		for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
-		{
-			// Call the function
-			(*it)();
+	void flush() {
+		// Reverse iterate the deletion queue to execute all the functions
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+			(*it)(); // Call functors
 		}
 
 		deletors.clear();
@@ -70,11 +103,9 @@ public:
 	VkInstance _instance;								// Vulkan library handle
 	VkDebugUtilsMessengerEXT _debug_messenger;			// Vulkan debug output handle
 	VkPhysicalDevice _chosenGPU;						// GPU chosen as the default device
+	VkPhysicalDeviceProperties _gpuProperties;
 	VkDevice _device;									// Vulkan device for commands
 	VkSurfaceKHR _surface;								// Vulkan window surface
-
-	VkSemaphore _presentSemaphore, _renderSemaphore;	// Semaphore sync structures
-	VkFence _renderFence;								// Fence sync structure
 
 	VkSwapchainKHR _swapchain;							// Vulkan swapchain
 	VkFormat _swapchainImageFormat;						// Image format expected by the windowing system
@@ -83,12 +114,15 @@ public:
 
 	VkQueue _graphicsQueue;								// Queue that will be submitted to
 	uint32_t _graphicsQueueFamily;						// The family of the graphics queue
-	
-	VkCommandPool _commandPool;							// The command pool for the cammands to be sent to the GPU
-	VkCommandBuffer _mainCommandBuffer;					// The buffer that will be recorded into
 
 	VkRenderPass _renderPass;							// Vulkan renderpass
 	std::vector<VkFramebuffer> _framebuffers;			// Array of framebuffers
+
+	FrameData _frames[FRAME_OVERLAP];					// Frame storage
+
+	VkDescriptorSetLayout _objectSetLayout;
+	VkDescriptorSetLayout _globalSetLayout;
+	VkDescriptorPool _descriptorPool;
 
 	VkPipelineLayout _trianglePipelineLayout;			// The layout of graphics pipeline
 
@@ -107,6 +141,9 @@ public:
 
 	VkFormat _depthFormat;
 
+	GPUSceneData _sceneParameters;
+	AllocatedBuffer _sceneParameterBuffer;
+
 	Mesh _triangleMesh;
 	Mesh _monkeyMesh;
 
@@ -115,6 +152,9 @@ public:
 
 	std::unordered_map<std::string, Material> _materials;
 	std::unordered_map<std::string, Mesh> _meshes;
+
+	// Getter for the frame currently being rendered
+	FrameData& get_current_frame();
 
 	// Create material and add it to the map
 	Material* create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string& name);
@@ -125,6 +165,9 @@ public:
 	// Returns nullptr if it can't be found
 	Mesh* get_mesh(const std::string& name);
 
+	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void init_descriptors();
+
 	// Draw function
 	void draw_objects(VkCommandBuffer cmd, RenderObject* first, int count);
 
@@ -134,6 +177,9 @@ public:
 	void load_meshes();
 
 	void upload_meshes(Mesh& mesh);
+
+	size_t pad_uniform_buffer_size(size_t originalSize);
+
 
 	//initializes everything in the engine
 	void init();
