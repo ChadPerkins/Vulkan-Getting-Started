@@ -14,10 +14,20 @@
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
+struct Texture {
+	AllocatedImage image;
+	VkImageView imageView;
+};
+
+struct UploadContext {
+	VkFence _uploadFence;
+	VkCommandPool _commandPool;
+	VkCommandBuffer _commandBuffer;
+};
+
 struct GPUObjectData {
 	glm::mat4 modelMatrix;
 };
-
 
 struct GPUSceneData {
 	glm::vec4 fogColor; // w is for exponent
@@ -52,6 +62,7 @@ struct FrameData {
 //note that we store the VkPipeline and layout by value, not pointer.
 //They are 64 bit handles to internal driver structures anyway so storing pointers to them isn't very useful
 struct Material {
+	VkDescriptorSet textureSet{ VK_NULL_HANDLE }; // Texture defaulted to null
 	VkPipeline pipeline;
 	VkPipelineLayout pipelineLayout;
 };
@@ -122,6 +133,7 @@ public:
 
 	VkDescriptorSetLayout _objectSetLayout;
 	VkDescriptorSetLayout _globalSetLayout;
+	VkDescriptorSetLayout _singleTextureSetLayout;
 	VkDescriptorPool _descriptorPool;
 
 	VkPipelineLayout _trianglePipelineLayout;			// The layout of graphics pipeline
@@ -153,6 +165,8 @@ public:
 	std::unordered_map<std::string, Material> _materials;
 	std::unordered_map<std::string, Mesh> _meshes;
 
+	std::unordered_map<std::string, Texture> _loadedTextures;
+
 	// Getter for the frame currently being rendered
 	FrameData& get_current_frame();
 
@@ -165,7 +179,12 @@ public:
 	// Returns nullptr if it can't be found
 	Mesh* get_mesh(const std::string& name);
 
+	UploadContext _uploadContext;
+
+	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
+
 	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+
 	void init_descriptors();
 
 	// Draw function
@@ -175,6 +194,8 @@ public:
 	bool load_shader_module(const char* filepath, VkShaderModule* outShaderModule);
 
 	void load_meshes();
+
+	void load_images();
 
 	void upload_meshes(Mesh& mesh);
 
