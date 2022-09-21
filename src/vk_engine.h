@@ -156,8 +156,8 @@ public:
 	GPUSceneData _sceneParameters;
 	AllocatedBuffer _sceneParameterBuffer;
 
-	Mesh _triangleMesh;
-	Mesh _monkeyMesh;
+	Mesh triangleMesh;
+	Mesh monkeyMesh;
 
 	// Default array of renderable objects
 	std::vector<RenderObject> _renderables;

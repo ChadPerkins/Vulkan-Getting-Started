@@ -264,11 +264,7 @@ void VulkanEngine::init_vulkan()
 
 	// Create the final Vulkan device
 	vkb::DeviceBuilder deviceBuilder{ physicalDevice };
-	VkPhysicalDeviceShaderDrawParametersFeatures shader_draw_parameters_features = {};
-	shader_draw_parameters_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
-	shader_draw_parameters_features.pNext = nullptr;
-	shader_draw_parameters_features.shaderDrawParameters = VK_TRUE;
-	vkb::Device vkbDevice = deviceBuilder.add_pNext(&shader_draw_parameters_features).build().value();
+	vkb::Device vkbDevice = deviceBuilder.build().value();
 
 	// Get the VkDevice handle used in the rest of a Vulkan application
 	_device = vkbDevice.device;
@@ -372,6 +368,11 @@ void VulkanEngine::init_default_renderpass()
 	// After the renderpass ends, set the layout of the image to be ready for displaying with the swapchain
 	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+	VkAttachmentReference color_attachment_ref = {};
+	// The attachment number will be the index number withing the parent renderpass's pAttachments array
+	color_attachment_ref.attachment = 0;
+	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
 	VkAttachmentDescription depth_attachment = {};
 	// Depth attachment
 	depth_attachment.flags = 0;
@@ -389,12 +390,6 @@ void VulkanEngine::init_default_renderpass()
 	depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	/////////// The subpass ///////////
-	// Create a subpass that uses the attachment
-	VkAttachmentReference color_attachment_ref = {};
-	// The attachment number will be the index number withing the parent renderpass's pAttachments array
-	color_attachment_ref.attachment = 0;
-	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
 	// Create 1 subpass, the minimum you can create
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -517,19 +512,14 @@ void VulkanEngine::init_sync_structures()
 	////////// Creating the fence //////////
 	VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
 
-	VkFenceCreateInfo uploadFenceCreateInfo = vkinit::fence_create_info();
-
 	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
 	for (int i = 0; i < FRAME_OVERLAP; i++) {
 
 		VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_frames[i]._renderFence));
 
-		VK_CHECK(vkCreateFence(_device, &uploadFenceCreateInfo, nullptr, &_uploadContext._uploadFence));
-		
 		// Enqueue the destruction of the fence
 		_mainDeletionQueue.push_function([=]() {
-			vkDestroyFence(_device, _uploadContext._uploadFence, nullptr);
 			vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
 		});
 
@@ -542,6 +532,13 @@ void VulkanEngine::init_sync_structures()
 			vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
 		});
 	}
+
+	VkFenceCreateInfo uploadFenceCreateInfo = vkinit::fence_create_info();
+
+	VK_CHECK(vkCreateFence(_device, &uploadFenceCreateInfo, nullptr, &_uploadContext._uploadFence));
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroyFence(_device, _uploadContext._uploadFence, nullptr);
+	});
 }
 
 void VulkanEngine::init_pipelines()
@@ -675,9 +672,9 @@ void VulkanEngine::init_pipelines()
 
 	_mainDeletionQueue.push_function([&]() {
 		vkDestroyPipeline(_device, meshPipeline, nullptr);
-		vkDestroyPipelineLayout(_device, meshPipLayout, nullptr);
-
 		vkDestroyPipeline(_device, texPipeline, nullptr);
+
+		vkDestroyPipelineLayout(_device, meshPipLayout, nullptr);
 		vkDestroyPipelineLayout(_device, texturedPipeLayout, nullptr);
 	});
 }
@@ -698,9 +695,10 @@ void VulkanEngine::init_scene()
 
 	_renderables.push_back(map);
 
-	for (int x = -20; x <= 20; x++) {
-		for (int y = -20; y <= 20; y++) {
-
+	for (int x = -20; x <= 20; x++)
+	{
+		for (int y = -20; y <= 20; y++)
+		{
 			RenderObject tri;
 			tri.mesh = get_mesh("triangle");
 			tri.material = get_material("defaultmesh");
@@ -711,14 +709,6 @@ void VulkanEngine::init_scene()
 			_renderables.push_back(tri);
 		}
 	}
-
-	// Create a sampler for the texture
-	VkSamplerCreateInfo samplerInfo = vkinit::sampler_create_info(VK_FILTER_NEAREST);
-
-	VkSampler blockySampler;
-	vkCreateSampler(_device, &samplerInfo, nullptr, &blockySampler);
-
-
 
 	Material* texturedMat = get_material("texturedmesh");
 
@@ -731,6 +721,16 @@ void VulkanEngine::init_scene()
 	allocInfo.pSetLayouts = &_singleTextureSetLayout;
 
 	vkAllocateDescriptorSets(_device, &allocInfo, &texturedMat->textureSet);
+
+	// Create a sampler for the texture
+	VkSamplerCreateInfo samplerInfo = vkinit::sampler_create_info(VK_FILTER_NEAREST);
+
+	VkSampler blockySampler;
+	vkCreateSampler(_device, &samplerInfo, nullptr, &blockySampler);
+
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroySampler(_device, blockySampler, nullptr);
+	});
 
 	// Write to the descriptor set so that it points to our empire_diffuse texture
 	VkDescriptorImageInfo imageBufferInfo;
@@ -790,17 +790,17 @@ bool VulkanEngine::load_shader_module(const char* filepath, VkShaderModule* outS
 void VulkanEngine::load_meshes()
 {
 	// Make the array the length of 3 vertices
-	_triangleMesh._vertices.resize(3);
+	triangleMesh._vertices.resize(3);
 
 	// Vertex Positions;
-	_triangleMesh._vertices[0].position = {  1.0f,  1.0f, 0.5f };
-	_triangleMesh._vertices[1].position = { -1.0f,  1.0f, 0.5f };
-	_triangleMesh._vertices[2].position = {  0.0f, -1.0f, 0.5f };
+	triangleMesh._vertices[0].position = {  1.0f,  1.0f, 0.5f };
+	triangleMesh._vertices[1].position = { -1.0f,  1.0f, 0.5f };
+	triangleMesh._vertices[2].position = {  0.0f, -1.0f, 0.5f };
 
 	// Vertex colors (all green)
-	_triangleMesh._vertices[0].color = { 0.0f, 1.0f, 0.0f }; 
-	_triangleMesh._vertices[1].color = { 0.0f, 1.0f, 0.0f }; 
-	_triangleMesh._vertices[2].color = { 0.0f, 1.0f, 0.0f }; 
+	triangleMesh._vertices[0].color = { 0.0f, 1.0f, 0.0f }; 
+	triangleMesh._vertices[1].color = { 0.0f, 1.0f, 0.0f }; 
+	triangleMesh._vertices[2].color = { 0.0f, 1.0f, 0.0f }; 
 
 	// Ignore vertex normals for now
 
@@ -812,13 +812,13 @@ void VulkanEngine::load_meshes()
 	lostEmpire.load_from_obj("../../assets/lost_empire.obj");
 
 	// Send the meshes to the GPU
-	upload_meshes(_triangleMesh);
+	upload_meshes(triangleMesh);
 	upload_meshes(monkeyMesh);
 	upload_meshes(lostEmpire);
 
 	//note that we are copying them. Eventually we will delete the hardcoded _monkey and _triangle meshes, so it's no problem now.
 	_meshes["monkey"] = monkeyMesh;
-	_meshes["triangle"] = _triangleMesh;
+	_meshes["triangle"] = triangleMesh;
 	_meshes["empire"] = lostEmpire;
 }
 
@@ -994,21 +994,20 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int co
 			// Object data descriptor
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 1, 1, &get_current_frame().objectDescriptor, 0, nullptr);
 			
-			if (object.material->textureSet != VK_NULL_HANDLE) {
+			if (object.material->textureSet != VK_NULL_HANDLE)
+			{
 				// Texture descriptor
 				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 2, 1, &object.material->textureSet, 0, nullptr);
 
 			}
 		}
 
-
-
 		glm::mat4 model = object.transformMatrix;
 		// Final render matrix, that we are calculating on the cpu
-		glm::mat4 mesh_matrix = projection * view * model;
+		glm::mat4 mesh_matrix = model;
 
 		MeshPushConstants constants;
-		constants.render_matrix = object.transformMatrix;
+		constants.render_matrix = mesh_matrix;
 
 		// Upload the mesh to the GPU via push constants
 		vkCmdPushConstants(cmd, object.material->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
@@ -1059,8 +1058,7 @@ AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, VkBufferUsageFlags
 void VulkanEngine::init_descriptors()
 {
 	// Create a descriptor pool
-	std::vector<VkDescriptorPoolSize> sizes =
-	{
+	std::vector<VkDescriptorPoolSize> sizes = {
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 },
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10 },
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 },
@@ -1187,7 +1185,7 @@ void VulkanEngine::init_descriptors()
 
 			vmaDestroyBuffer(_allocator, _frames[i].objectBuffer._buffer, _frames[i].objectBuffer._allocation);
 		}
-		});
+	});
 
 }
 
@@ -1242,7 +1240,7 @@ void VulkanEngine::load_images()
 
 	_mainDeletionQueue.push_function([=]() {
 		vkDestroyImageView(_device, lostEmpire.imageView, nullptr);
-		});
+	});
 
 	_loadedTextures["empire_diffuse"] = lostEmpire;
 }
